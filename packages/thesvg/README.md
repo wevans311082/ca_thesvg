@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://thesvg.org">
-    <img src="https://raw.githubusercontent.com/GLINCKER/thesvg/main/public/logo.svg" alt="theSVG" width="120" height="120" />
+    <img src="https://raw.githubusercontent.com/GLINCKER/thesvg/main/public/logo-github.png" alt="theSVG" width="120" height="120" />
   </a>
 </p>
 

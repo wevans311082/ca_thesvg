@@ -40,12 +40,21 @@ export const metadata: Metadata = {
     siteName: "theSVG",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1470,
+        height: 800,
+        alt: "theSVG - 3,847 brand SVG icons for developers",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "theSVG - The Open SVG Brand Library",
     description:
       "4,600+ brand SVGs in one place. Search, preview, copy. Free, open-source, community-driven.",
+    images: ["/og-image.png"],
   },
   icons: {
     icon: "/icon.svg",

@@ -1,227 +1,170 @@
 <p align="center">
-  <!-- Add screenshot -->
-  <h1 align="center">thesvg</h1>
-  <p align="center">3,800+ brand SVGs for developers and designers</p>
+  <a href="https://thesvg.org">
+    <img src="https://raw.githubusercontent.com/GLINCKER/thesvg/main/public/logo-github.png" alt="theSVG" width="120" height="120" />
+  </a>
+</p>
+
+<h3 align="center">theSVG</h3>
+
+<p align="center">
+  3,847 brand SVG icons for developers and designers.<br/>
+  Search, copy, and drop into any project. Free and open source.
 </p>
 
 <p align="center">
-  <a href="https://github.com/GLINCKER/thesvg/stargazers"><img src="https://img.shields.io/github/stars/GLINCKER/thesvg?style=flat&color=gold" alt="Stars" /></a>
-  <a href="https://github.com/GLINCKER/thesvg/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GLINCKER/thesvg?style=flat" alt="License: MIT" /></a>
-  <a href="https://thesvg.org"><img src="https://img.shields.io/badge/icons-3%2C846-blue?style=flat" alt="3,846 icons" /></a>
-  <a href="https://thesvg.org"><img src="https://img.shields.io/badge/website-thesvg.org-brightgreen?style=flat" alt="thesvg.org" /></a>
+  <a href="https://www.npmjs.com/package/thesvg"><img src="https://img.shields.io/npm/v/thesvg?color=F97316&label=npm" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/thesvg"><img src="https://img.shields.io/npm/dm/thesvg?color=F97316" alt="downloads" /></a>
+  <a href="https://github.com/GLINCKER/thesvg/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GLINCKER/thesvg" alt="MIT license" /></a>
+  <a href="https://github.com/GLINCKER/thesvg/stargazers"><img src="https://img.shields.io/github/stars/GLINCKER/thesvg?style=social" alt="GitHub stars" /></a>
 </p>
 
 <p align="center">
-  <a href="https://thesvg.org">Browse Icons</a> -
-  <a href="#cdn--direct-urls">CDN Usage</a> -
-  <a href="#api">API</a> -
+  <a href="https://thesvg.org"><strong>Browse Icons</strong></a> &middot;
+  <a href="#install">Install</a> &middot;
+  <a href="#cdn">CDN</a> &middot;
+  <a href="#api">API</a> &middot;
   <a href="#contributing">Contribute</a>
 </p>
 
 ---
 
-**3,846 brand SVG icons** in one place. Search, copy, and drop into any project. Free, open-source, community-driven. No gatekeeping - every brand deserves a place.
+## Install
+
+```bash
+npm install thesvg
+```
+
+```ts
+import github from "thesvg/github";
+
+github.svg;        // raw SVG string
+github.title;      // "GitHub"
+github.hex;        // "181717"
+github.variants;   // { default: "<svg...>", mono: "<svg...>" }
+```
+
+Also available as a scoped package:
+
+```bash
+npm install @the-svg/icons
+```
+
+Tree-shakeable, typed, dual ESM/CJS. Only the icons you import end up in your bundle.
 
 ## Features
 
-- **3,846 brand icons** with multi-variant support (color, mono, light, dark, wordmark)
+- **3,847 brand icons** with multi-variant support (color, mono, light, dark, wordmark)
+- **Tree-shakeable npm package** - import one icon, ship only that icon
+- **TypeScript types** for every icon module
 - **Instant search** with fuzzy matching and keyboard shortcut (Cmd+K / Ctrl+K)
 - **Filter by category** - AI, Software, Framework, Language, Design, and more
-- **One-click copy** as SVG markup, JSX, Vue, CDN URL, or Data URI
-- **Compact and comfortable** view modes
+- **One-click copy** as SVG, JSX, Vue, CDN URL, or Data URI
 - **Shareable URLs** - every search and icon page has a permanent link
 - **Dark mode** default with light theme toggle
 - **SEO-optimized** icon pages for every brand
 - **Gradient SVG support** - not just flat colors
 
-## Quick Start
+## CDN
 
-### CDN (no install required)
-
-Drop any icon directly into HTML using jsDelivr:
-
-```html
-<img
-  src="https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/github/default.svg"
-  width="32"
-  height="32"
-  alt="GitHub"
-/>
-```
-
-Or reference icons directly from thesvg.org:
+Use any icon directly without installing:
 
 ```html
 <img src="https://thesvg.org/icons/github/default.svg" width="32" height="32" alt="GitHub" />
 ```
 
-### npm package (coming soon)
+Or via jsDelivr:
 
-```bash
-npm install @thesvg/icons
+```html
+<img src="https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/github/default.svg" width="32" height="32" alt="GitHub" />
 ```
 
-### React example
+### URL Pattern
 
-```jsx
-export function BrandIcon({ slug, variant = "default", size = 32 }) {
+| Source | Pattern |
+|--------|---------|
+| thesvg.org | `https://thesvg.org/icons/{slug}/{variant}.svg` |
+| jsDelivr | `https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/{slug}/{variant}.svg` |
+
+## Usage
+
+### React
+
+```tsx
+import { svg } from "thesvg/github";
+
+export function GitHubLogo() {
+  return <div dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+```
+
+### CDN Component (React)
+
+```tsx
+export function BrandIcon({ slug, size = 32 }: { slug: string; size?: number }) {
   return (
     <img
-      src={`https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/${slug}/${variant}.svg`}
+      src={`https://thesvg.org/icons/${slug}/default.svg`}
       width={size}
       height={size}
       alt={slug}
     />
   );
 }
-
-// Usage
-<BrandIcon slug="vercel" />
-<BrandIcon slug="react" variant="mono" size={24} />
 ```
 
-### Vue example
+### Vue
 
 ```vue
 <template>
-  <img
-    :src="`https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/${slug}/${variant}.svg`"
-    :width="size"
-    :height="size"
-    :alt="slug"
-  />
+  <img :src="`https://thesvg.org/icons/${slug}/default.svg`" :width="size" :alt="slug" />
 </template>
 
 <script setup>
-defineProps({
-  slug: String,
-  variant: { type: String, default: "default" },
-  size: { type: Number, default: 32 },
-});
+defineProps({ slug: String, size: { type: Number, default: 32 } });
 </script>
 ```
 
-### Plain HTML
+## Variants
 
-```html
-<!-- Inline SVG (copy from thesvg.org) -->
-<svg viewBox="0 0 24 24" width="32" height="32">...</svg>
-
-<!-- Via CDN URL -->
-<img src="https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/nextjs/default.svg" />
-
-<!-- Via Data URI (generated by thesvg.org copy menu) -->
-<img src="data:image/svg+xml;base64,..." />
-```
-
-## CDN / Direct URLs
-
-All icons are available at two stable endpoints:
-
-| Source | URL pattern |
-|--------|-------------|
-| jsDelivr CDN | `https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/{slug}/{variant}.svg` |
-| thesvg.org | `https://thesvg.org/icons/{slug}/{variant}.svg` |
-
-Replace `{slug}` with the icon identifier (e.g. `github`, `vercel`, `react`) and `{variant}` with one of the variant names below.
-
-## Available Variants
+| Variant | Key | Description |
+|---------|-----|-------------|
+| Default | `default` | Primary brand color |
+| Mono | `mono` | Single-color monochrome |
+| Light | `light` | For light backgrounds |
+| Dark | `dark` | For dark backgrounds |
+| Wordmark | `wordmark` | Text-based logo |
 
 Not all icons have every variant. The `default` variant is always present.
 
-| Variant | Key | Description | Count |
-|---------|-----|-------------|-------|
-| Default | `default` | Primary brand color variant | 3,846 |
-| Mono | `mono` | Single-color monochrome | 3,374 |
-| Light | `light` | Optimized for light backgrounds | 145 |
-| Dark | `dark` | Optimized for dark backgrounds | 145 |
-| Wordmark | `wordmark` | Text-based logo variant | 130 |
-| Wordmark Light | `wordmark-light` | Wordmark for light backgrounds | 98 |
-| Wordmark Dark | `wordmark-dark` | Wordmark for dark backgrounds | 98 |
-
 ## API
 
-All endpoints return JSON. Base URL: `https://thesvg.org`
+Base URL: `https://thesvg.org`
 
-### Browse and search icons
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/icons?q=github&category=AI&limit=20` | Search icons |
+| `GET /api/icons/{slug}` | Get single icon with metadata |
+| `GET /api/categories` | List all categories with counts |
+| `GET /icons/{slug}/{variant}.svg` | Raw SVG file |
 
-```
-GET /api/icons?q=github&category=Devtool&limit=20&offset=0
-```
+## Packages
 
-Response: `{ total, offset, limit, icons: [...] }`
-
-### Get a single icon
-
-```
-GET /api/icons/{slug}
-```
-
-Response: full icon entry with all variants and metadata.
-
-### List categories
-
-```
-GET /api/categories
-```
-
-Response: `{ categories: [{ name, count }] }`
-
-### Browse URLs
-
-| Resource | URL |
-|----------|-----|
-| Icon gallery | `https://thesvg.org` |
-| Icon detail page | `https://thesvg.org/icon/{slug}` |
-| SVG file | `https://thesvg.org/icons/{slug}/{variant}.svg` |
-| CDN mirror | `https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/{slug}/{variant}.svg` |
-
-## Categories
-
-| Category | Icons |
-|----------|-------|
-| Software | 310 |
-| AI | 212 |
-| Library | 76 |
-| Framework | 49 |
-| Language | 36 |
-| Design | 29 |
-| Social | 27 |
-| Microsoft | 27 |
-| Crypto | 21 |
-| Database | 21 |
-| Devtool | 18 |
-| CMS | 13 |
-| Browser | 13 |
-| Community | 13 |
-| Google | 22 |
+| Package | Description | Status |
+|---------|-------------|--------|
+| [`thesvg`](https://www.npmjs.com/package/thesvg) | All icons, one package | Published |
+| [`@the-svg/icons`](https://www.npmjs.com/package/@the-svg/icons) | Core icon data | Published |
+| `@the-svg/react` | React components | Coming soon |
+| `@the-svg/cli` | CLI tool | Coming soon |
 
 ## Contributing
 
 Every brand deserves a place. No gatekeeping.
 
-### Request an icon
+**Submit an icon:** [thesvg.org/submit](https://thesvg.org/submit) or open a [pull request](https://github.com/GLINCKER/thesvg/pulls).
 
-Open an [issue](https://github.com/GLINCKER/thesvg/issues) with the brand name and a link to official brand assets. Label it `icon-request`.
+**Report an issue:** Use our [issue templates](https://github.com/GLINCKER/thesvg/issues/new/choose).
 
-### Submit an icon
-
-1. Fork this repo
-2. Add SVG files to `public/icons/{slug}/` (at minimum `default.svg`)
-3. Add an entry to `src/data/icons.json` with the slug, title, categories, and variants
-4. Run `pnpm build` to validate
-5. Open a pull request
-
-### SVG file requirements
-
-- Valid SVG/XML markup with a `viewBox` attribute
-- Under 10KB per file
-- No embedded scripts or external references
-- No raster images embedded in the SVG
-- Gradients and multi-color SVGs are welcome
-- You must have the right to redistribute the icon
-
-### Development setup
+**Development setup:**
 
 ```bash
 git clone https://github.com/GLINCKER/thesvg.git
@@ -230,29 +173,22 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to browse icons locally.
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | [Next.js 15](https://nextjs.org) - App Router with SSG |
-| Styling | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| Search | [Fuse.js](https://fusejs.io) - client-side fuzzy search |
-| Hosting | [Vercel](https://vercel.com) |
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for full guidelines.
 
 ## Credits
 
-Icons aggregated and curated from multiple open-source libraries:
+Icons aggregated and curated from open-source libraries:
 
 - [simple-icons](https://github.com/simple-icons/simple-icons) - monochrome SVG icons for popular brands
 - [svgl](https://github.com/pheralb/svgl) - beautiful SVG logos
 - [lobe-icons](https://github.com/lobehub/lobe-icons) - AI and tech brand icons
 
-All icons remain under their respective licenses. See individual icon entries in `src/data/icons.json` for per-icon license information.
+All icons remain under their respective licenses.
 
 ## License
 
-[MIT](./LICENSE) - thesvg library code and infrastructure.
+[MIT](./LICENSE). Individual icon trademarks belong to their respective owners.
 
-Individual icon trademarks belong to their respective owners.
+<p align="center">
+  <a href="https://thesvg.org">thesvg.org</a>
+</p>

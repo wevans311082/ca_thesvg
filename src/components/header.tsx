@@ -61,9 +61,14 @@ export function Header() {
             aria-label="npm"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <svg viewBox="0 0 780 250" className="h-5 w-5" aria-hidden="true">
-              <path fill="#CB3837" d="M240 250h100V0H240v250zm-30 0H0V0h210v220H90V30H30v220h150V0h30v250zm390 0H390V0h210v250zM450 30v190h60V30h-60z" />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/npm/default.svg"
+              alt="npm"
+              width={18}
+              height={18}
+              className="h-[18px] w-[18px] rounded-sm"
+            />
           </a>
           <a
             href="https://github.com/GLINCKER/thesvg"
