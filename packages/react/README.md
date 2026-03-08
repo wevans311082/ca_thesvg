@@ -140,5 +140,4 @@ Over 3,800 brand icons are available. Browse the full list at
 
 MIT - see [LICENSE](./LICENSE).
 
-Icons are sourced from various projects under their respective licenses.
-See [thesvg.org](https://thesvg.org) for per-icon license details.
+Brand icons and logos are the property of their respective trademark holders. See [thesvg.org](https://thesvg.org) for details.

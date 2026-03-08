@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getAllIcons, getIconBySlug, getIconsByCategory } from "@/lib/icons";
+import { getAllIcons, getIconBySlug, getIconsByCategory, getCategoryCounts } from "@/lib/icons";
 import { IconDetailPage } from "@/components/icons/icon-detail-page";
+import { SidebarShell } from "@/components/layout/sidebar-shell";
 import type { Metadata } from "next";
 
 interface PageProps {
@@ -59,13 +61,14 @@ export default async function IconPage({ params }: PageProps) {
   const icon = getIconBySlug(slug);
   if (!icon) notFound();
 
-  // Gather related icons: same primary category, excluding self, capped at 8
   const primaryCategory = icon.categories[0] ?? null;
   const relatedIcons = primaryCategory
     ? getIconsByCategory(primaryCategory)
         .filter((rel) => rel.slug !== icon.slug)
         .slice(0, 8)
     : [];
+
+  const categoryCounts = getCategoryCounts();
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -86,7 +89,11 @@ export default async function IconPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <IconDetailPage icon={icon} relatedIcons={relatedIcons} />
+      <Suspense>
+        <SidebarShell categoryCounts={categoryCounts}>
+          <IconDetailPage icon={icon} relatedIcons={relatedIcons} />
+        </SidebarShell>
+      </Suspense>
     </>
   );
 }

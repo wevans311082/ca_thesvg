@@ -46,7 +46,6 @@
   ],
   "scripts": {
     "build": "tsx scripts/build-icons.ts",
-    "enrich": "tsx scripts/enrich-svgl-variants.ts",
     "audit": "node scripts/security-audit.mjs",
     "validate": "node scripts/validate-dist.mjs",
     "prepublishOnly": "npm run build && npm run audit && npm run validate"

@@ -1,7 +1,8 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
-import { Check, Copy, Download, ExternalLink, Heart } from "lucide-react";
+import { Check, Copy, Download, Eye, Heart } from "lucide-react";
+import Link from "next/link";
 import posthog from "posthog-js";
 import type { IconEntry } from "@/lib/icons";
 import { useFavoritesStore } from "@/lib/stores/favorites-store";
@@ -86,14 +87,13 @@ export const IconCard = memo(function IconCard({
     [icon.slug, toggleFavorite]
   );
 
-  const handleLink = useCallback(
+  const handlePreview = useCallback(
     (e: React.MouseEvent) => {
+      e.preventDefault();
       e.stopPropagation();
-      if (icon.url) {
-        window.open(icon.url, "_blank", "noopener,noreferrer");
-      }
+      onSelect(icon);
     },
-    [icon.url]
+    [icon, onSelect]
   );
 
   const primaryCategory = icon.categories[0];
@@ -106,9 +106,8 @@ export const IconCard = memo(function IconCard({
   /* ── Compact: icon-only grid ── */
   if (compact) {
     return (
-      <button
-        type="button"
-        onClick={() => onSelect(icon)}
+      <Link
+        href={`/icon/${icon.slug}`}
         className="group relative flex w-full min-w-0 flex-col items-center gap-1.5 overflow-hidden rounded-xl border border-border/40 bg-card/80 p-3 transition-all duration-200 hover:border-border hover:bg-card hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div
@@ -136,15 +135,14 @@ export const IconCard = memo(function IconCard({
           )}
         </div>
         <span className="w-full truncate text-center text-[10px] font-medium text-foreground">{icon.title}</span>
-      </button>
+      </Link>
     );
   }
 
   /* ── Default: modern spacious card ── */
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(icon)}
+    <Link
+      href={`/icon/${icon.slug}`}
       className="group relative flex h-full min-w-0 flex-col items-center rounded-xl border border-border/40 bg-card/80 transition-all duration-200 hover:border-border hover:bg-card hover:shadow-lg hover:shadow-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:shadow-black/20"
     >
       {/* Favorite toggle */}
@@ -235,18 +233,16 @@ export const IconCard = memo(function IconCard({
         >
           <Download className="h-3.5 w-3.5" />
         </div>
-        {icon.url && (
-          <div
-            onClick={handleLink}
-            role="button"
-            tabIndex={-1}
-            aria-label="Open website"
-            className="flex h-7 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </div>
-        )}
+        <div
+          onClick={handlePreview}
+          role="button"
+          tabIndex={-1}
+          aria-label="Quick preview"
+          className="flex h-7 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        >
+          <Eye className="h-3.5 w-3.5" />
+        </div>
       </div>
-    </button>
+    </Link>
   );
 });

@@ -1,4 +1,4 @@
-export type SnippetFormat = "react" | "vue" | "html" | "nextjs" | "css";
+export type SnippetFormat = "react" | "vue" | "html" | "nextjs" | "css" | "cli" | "mcp";
 
 const CDN_BASE =
   "https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons";
@@ -125,6 +125,35 @@ export default function App() {
   width: 24px;
   height: 24px;
 }`;
+
+    case "cli":
+      return `# Install globally
+npm install -g @thesvg/cli
+
+# Add icon to your project
+npx @thesvg/cli add ${slug}
+
+# Add as React/JSX component
+npx @thesvg/cli add ${slug} --format jsx
+
+# Search for related icons
+npx @thesvg/cli search ${slug.split("-")[0]}`;
+
+    case "mcp":
+      return `// Claude Desktop / Cursor / Windsurf
+// Add to your MCP config:
+{
+  "mcpServers": {
+    "thesvg": {
+      "command": "npx",
+      "args": ["-y", "@thesvg/mcp-server"]
+    }
+  }
+}
+
+// Then ask your AI:
+// "Get the ${title} SVG icon"
+// "Search for icons like ${slug}"`;
 
     default:
       return "";

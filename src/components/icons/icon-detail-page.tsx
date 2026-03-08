@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   ChevronUp,
   Code,
   Copy,
   Download,
-  ExternalLink,
   FileCode2,
   Globe,
   Heart,
@@ -59,12 +59,12 @@ const FORMAT_BUTTONS: {
   { value: "data-uri", label: "URI", icon: <Globe className="h-3.5 w-3.5" /> },
 ];
 
-const SNIPPET_TABS: { value: SnippetFormat; label: string }[] = [
-  { value: "react", label: "React" },
-  { value: "vue", label: "Vue" },
-  { value: "html", label: "HTML" },
-  { value: "nextjs", label: "Next.js" },
-  { value: "css", label: "CSS" },
+const SNIPPET_TABS: { value: SnippetFormat; label: string; iconSlug?: string }[] = [
+  { value: "react", label: "React", iconSlug: "react" },
+  { value: "vue", label: "Vue", iconSlug: "vue" },
+  { value: "html", label: "HTML", iconSlug: "html5" },
+  { value: "nextjs", label: "Next.js", iconSlug: "nextdotjs" },
+  { value: "css", label: "CSS", iconSlug: "css" },
 ];
 
 const DEMO_SIZES = [16, 24, 32, 48, 64];
@@ -77,17 +77,87 @@ function formatSvgCode(raw: string): string {
     .trim();
 }
 
+/** Escape HTML so raw code is safe inside dangerouslySetInnerHTML */
+function esc(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Wrap text in a colored span using placeholder markers first, then expand */
+function colorize(line: string, format: SnippetFormat): string {
+  // Escape HTML first
+  let s = esc(line);
+
+  // Use Unicode private-use markers so regex steps don't interfere
+  const S = "\uE000"; // start marker
+  const E = "\uE001"; // end marker
+  const tag = (cls: string, text: string) => `${S}${cls}${E}${text}${S}/${E}`;
+
+  if (format === "css") {
+    s = s
+      .replace(/([\w-]+)(\s*:\s*)/g, (_, p, c) => tag("text-purple-400", p) + c)
+      .replace(/:\s*([^;]+)(;?)/g, (_, v, sc) => ": " + tag("text-green-400", v) + sc)
+      .replace(/^(\.[^\s{]+)/gm, (_, sel) => tag("text-blue-400", sel));
+  } else if (format === "html" || format === "vue") {
+    s = s
+      .replace(/(&lt;)(\/?\w+)/g, (_, lt, t) => lt + tag("text-pink-400", t))
+      .replace(/([\w-]+)(=)/g, (_, a, eq) => tag("text-purple-400", a) + eq)
+      .replace(/"([^"]*)"/g, (_, v) => tag("text-green-400", `"${v}"`));
+  } else {
+    s = s
+      .replace(/\b(import|from|export|default|function|return|const)\b/g, (_, k) => tag("text-purple-400", k))
+      .replace(/"([^"]*)"/g, (_, v) => tag("text-green-400", `"${v}"`))
+      .replace(/'([^']*)'/g, (_, v) => tag("text-green-400", `'${v}'`))
+      .replace(/(&lt;)(\/?\w+)/g, (_, lt, t) => lt + tag("text-pink-400", t))
+      .replace(/([\w-]+)(=)/g, (_, a, eq) => tag("text-orange-300", a) + eq);
+  }
+
+  // Expand markers to real HTML: close tags first to avoid regex collision
+  s = s.replace(new RegExp(`${S}/${E}`, "g"), "</span>");
+  s = s.replace(new RegExp(`${S}([^${E}]+)${E}`, "g"), '<span class="$1">');
+  return s;
+}
+
+function colorizeSnippet(code: string, format: SnippetFormat): React.ReactNode {
+  return code.split("\n").map((line, i, arr) => (
+    <span key={i}>
+      <span dangerouslySetInnerHTML={{ __html: colorize(line, format) }} />
+      {i < arr.length - 1 ? "\n" : ""}
+    </span>
+  ));
+}
+
+function colorizeSvgCode(code: string): React.ReactNode {
+  return code.split("\n").map((line, i, arr) => {
+    let s = esc(line);
+    const S = "\uE000", E = "\uE001";
+    const tag = (cls: string, text: string) => `${S}${cls}${E}${text}${S}/${E}`;
+    s = s
+      .replace(/(&lt;)(\/?\w[\w-]*)/g, (_, lt, t) => lt + tag("text-pink-400", t))
+      .replace(/([\w-]+)(=)/g, (_, a, eq) => tag("text-purple-400", a) + eq)
+      .replace(/"([^"]*)"/g, (_, v) => tag("text-green-400", `"${v}"`));
+    s = s.replace(new RegExp(`${S}/${E}`, "g"), "</span>");
+    s = s.replace(new RegExp(`${S}([^${E}]+)${E}`, "g"), '<span class="$1">');
+    return (
+      <span key={i}>
+        <span dangerouslySetInnerHTML={{ __html: s }} />
+        {i < arr.length - 1 ? "\n" : ""}
+      </span>
+    );
+  });
+}
+
 export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps) {
   const [activeVariant, setActiveVariant] = useState("default");
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [svgContent, setSvgContent] = useState("");
   const [showCode, setShowCode] = useState(false);
-  const [showSnippets, setShowSnippets] = useState(false);
+  const [showSnippets, setShowSnippets] = useState(true);
   const [activeSnippetFormat, setActiveSnippetFormat] =
     useState<SnippetFormat>("react");
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [exportingSize, setExportingSize] = useState<number | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
 
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const isFavorite = useFavoritesStore((s) =>
@@ -196,34 +266,34 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
       {/* Breadcrumb */}
       <nav
         aria-label="Breadcrumb"
-        className="mb-6 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
+        className="mb-6 flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
       >
         <Link
           href="/"
           className="flex items-center gap-1 transition-colors hover:text-foreground"
         >
-          <Home className="h-3 w-3" />
-          Home
+          <Home className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Home</span>
         </Link>
         {primaryCategory && (
           <>
-            <span>/</span>
+            <span className="text-border">/</span>
             <Link
               href={`/?category=${encodeURIComponent(primaryCategory)}`}
-              className="transition-colors hover:text-foreground"
+              className="font-medium transition-colors hover:text-foreground"
             >
               {primaryCategory}
             </Link>
           </>
         )}
-        <span>/</span>
-        <span className="min-w-0 truncate text-foreground">{icon.title}</span>
+        <span className="text-border">/</span>
+        <span className="min-w-0 truncate font-semibold text-foreground">{icon.title}</span>
       </nav>
 
       {/* Main two-column layout */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
-        {/* Left column: large preview */}
-        <div className="flex flex-col gap-4">
+        {/* Left column: large preview - sticky on desktop */}
+        <div className="flex flex-col gap-4 lg:sticky lg:top-20 lg:h-fit">
           {/* Preview card */}
           <div className="icon-preview-bg relative flex items-center justify-center rounded-2xl p-16">
             <img
@@ -286,15 +356,78 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
               ))}
             </div>
           </div>
+
+          {/* Quick metadata */}
+          <div className="rounded-xl border border-border bg-card p-3 space-y-2.5">
+            {icon.license && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">License</span>
+                <span className="text-xs text-muted-foreground">{icon.license}</span>
+              </div>
+            )}
+            {variants.length > 1 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Variants</span>
+                <span className="text-xs text-muted-foreground">{variants.length}</span>
+              </div>
+            )}
+            {icon.categories.length > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Category</span>
+                <span className="text-xs text-muted-foreground">{icon.categories[0]}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Website + Guidelines links */}
+          {(icon.url || icon.guidelines) && (
+            <div className="space-y-1.5">
+              {icon.url && (() => {
+                const hostname = new URL(icon.url).hostname.replace("www.", "");
+                return (
+                  <a
+                    href={icon.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+                      alt=""
+                      className="h-3.5 w-3.5 rounded-sm"
+                    />
+                    <span className="flex-1 truncate">{hostname}</span>
+                    <ArrowUpRight className="h-3 w-3 opacity-50" />
+                  </a>
+                );
+              })()}
+              {icon.guidelines && (() => {
+                const hostname = new URL(icon.guidelines).hostname.replace("www.", "");
+                return (
+                  <a
+                    href={icon.guidelines}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    <span className="flex-1 truncate">Brand guidelines</span>
+                    <ArrowUpRight className="h-3 w-3 opacity-50" />
+                  </a>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Right column: info + actions */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {/* Title + slug + download */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-3xl font-bold tracking-tight">{icon.title}</h1>
-              <p className="mt-1 font-mono text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold tracking-tight">{icon.title}</h1>
+              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                 {icon.slug}
               </p>
             </div>
@@ -382,9 +515,9 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                   key={fmt.value}
                   type="button"
                   className={cn(
-                    "flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors",
+                    "flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-all duration-150",
                     copiedFormat === fmt.value
-                      ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
+                      ? "scale-[1.03] border-green-500/30 bg-green-500/10 text-green-600 shadow-sm dark:text-green-400"
                       : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                   onClick={() => handleCopy(fmt.value)}
@@ -400,10 +533,65 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
             </div>
           </div>
 
+          {/* Quick Commands - CLI, MCP, CDN */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card">
+              <span className="shrink-0 rounded bg-orange-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-orange-500">CLI</span>
+              <code className="flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                npx @thesvg/cli add {icon.slug}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`npx @thesvg/cli add ${icon.slug}`);
+                  setCopiedCmd("cli");
+                  setTimeout(() => setCopiedCmd(null), 1500);
+                }}
+                className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              >
+                {copiedCmd === "cli" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card">
+              <span className="shrink-0 rounded bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-purple-500">MCP</span>
+              <code className="flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                npx -y @thesvg/mcp-server
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`npx -y @thesvg/mcp-server`);
+                  setCopiedCmd("mcp");
+                  setTimeout(() => setCopiedCmd(null), 1500);
+                }}
+                className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              >
+                {copiedCmd === "mcp" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card">
+              <span className="shrink-0 rounded bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-500">CDN</span>
+              <code className="flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                cdn.jsdelivr.net/.../icons/{icon.slug}/default.svg
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://cdn.jsdelivr.net/gh/GLINCKER/thesvg@main/public/icons/${icon.slug}/default.svg`);
+                  setCopiedCmd("cdn");
+                  setTimeout(() => setCopiedCmd(null), 1500);
+                }}
+                className="shrink-0 rounded p-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+              >
+                {copiedCmd === "cdn" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+              </button>
+            </div>
+          </div>
+
           {/* Export PNG */}
           <div>
-            <div className="mb-2 flex items-center gap-1.5">
-              <Image className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="mb-3 flex items-center gap-2">
+              <Image className="h-3.5 w-3.5 text-orange-500/70" />
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Export PNG
               </p>
@@ -416,18 +604,19 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                   disabled={exportingSize !== null}
                   onClick={() => handlePngExport(size)}
                   className={cn(
-                    "flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors",
+                    "group/png relative flex h-9 items-center gap-2 overflow-hidden rounded-lg border px-3.5 text-xs font-semibold transition-all duration-200",
                     exportingSize === size
-                      ? "border-border/50 bg-muted/60 text-muted-foreground"
-                      : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                      ? "border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                      : "border-border bg-card text-muted-foreground hover:border-orange-500/30 hover:bg-orange-500/5 hover:text-orange-500 hover:shadow-sm disabled:opacity-50 dark:hover:text-orange-400"
                   )}
                 >
                   {exportingSize === size ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <Image className="h-3.5 w-3.5" />
+                    <Download className="h-3 w-3 opacity-40 transition-opacity group-hover/png:opacity-100" />
                   )}
-                  {size}px
+                  <span className="font-mono tabular-nums">{size}</span>
+                  <span className="text-[10px] opacity-50">px</span>
                 </button>
               ))}
             </div>
@@ -436,8 +625,8 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
             )}
           </div>
 
-          {/* Usage snippets (collapsible) */}
-          <div className="overflow-hidden rounded-xl border border-border">
+          {/* Usage snippets */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card/30 shadow-sm">
             <button
               type="button"
               onClick={() => setShowSnippets(!showSnippets)}
@@ -454,7 +643,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
               )}
             </button>
             {showSnippets && (
-              <div className="border-t border-border">
+              <div className="border-t border-border/50">
                 {/* Format tabs */}
                 <div className="flex flex-wrap gap-1.5 px-4 pt-3 pb-2">
                   {SNIPPET_TABS.map((tab) => (
@@ -463,17 +652,30 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                       type="button"
                       onClick={() => setActiveSnippetFormat(tab.value)}
                       className={cn(
-                        "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                        "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                         activeSnippetFormat === tab.value
                           ? "bg-foreground text-background"
                           : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
+                      {tab.iconSlug && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={`/icons/${tab.iconSlug}/default.svg`}
+                          alt=""
+                          className={cn(
+                            "h-3 w-3",
+                            activeSnippetFormat === tab.value
+                              ? "brightness-0 invert dark:invert-0"
+                              : "dark:invert"
+                          )}
+                        />
+                      )}
                       {tab.label}
                     </button>
                   ))}
                 </div>
-                {/* Code block */}
+                {/* Code block with syntax coloring */}
                 <div className="relative px-4 pb-4">
                   <button
                     type="button"
@@ -482,7 +684,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                       "absolute top-2 right-7 z-10 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
                       copiedSnippet
                         ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                        : "bg-background/80 text-muted-foreground backdrop-blur-sm hover:bg-accent hover:text-accent-foreground"
+                        : "bg-zinc-800/80 text-zinc-400 backdrop-blur-sm hover:bg-zinc-700 hover:text-zinc-200"
                     )}
                   >
                     {copiedSnippet ? (
@@ -492,9 +694,11 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                     )}
                     {copiedSnippet ? "Copied" : "Copy"}
                   </button>
-                  <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/30">
-                    <pre className="max-h-64 overflow-auto p-4 pr-16 font-mono text-[10px] leading-5 text-foreground/80">
-                      <code className="block whitespace-pre">{activeSnippet}</code>
+                  <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+                    <pre className="max-h-64 overflow-auto p-4 pr-16 font-mono text-[11px] leading-6 text-zinc-300">
+                      <code className="block whitespace-pre-wrap break-all">
+                        {colorizeSnippet(activeSnippet, activeSnippetFormat)}
+                      </code>
                     </pre>
                   </div>
                 </div>
@@ -502,8 +706,8 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
             )}
           </div>
 
-          {/* SVG code viewer (collapsible) */}
-          <div className="overflow-hidden rounded-xl border border-border">
+          {/* SVG code viewer */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card/30 shadow-sm">
             <button
               type="button"
               onClick={() => setShowCode(!showCode)}
@@ -519,7 +723,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
               )}
             </button>
             {showCode && formattedCode && (
-              <div className="relative border-t border-border">
+              <div className="relative border-t border-border/50">
                 <button
                   type="button"
                   onClick={handleCopyRaw}
@@ -527,7 +731,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                     "absolute top-2 right-3 z-10 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
                     copiedFormat === "raw"
                       ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                      : "bg-background/80 text-muted-foreground backdrop-blur-sm hover:bg-accent hover:text-accent-foreground"
+                      : "bg-zinc-800/80 text-zinc-400 backdrop-blur-sm hover:bg-zinc-700 hover:text-zinc-200"
                   )}
                 >
                   {copiedFormat === "raw" ? (
@@ -537,58 +741,43 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                   )}
                   {copiedFormat === "raw" ? "Copied" : "Copy"}
                 </button>
-                <pre className="max-h-64 overflow-auto bg-muted/30 p-4 pr-16 font-mono text-[11px] leading-5 text-foreground/80">
-                  <code className="block whitespace-pre">{formattedCode}</code>
-                </pre>
+                <div className="overflow-hidden rounded-b-xl bg-zinc-950">
+                  <pre className="max-h-64 overflow-auto p-4 pr-16 font-mono text-[11px] leading-5 text-zinc-300">
+                    <code className="block whitespace-pre-wrap break-all">
+                      {colorizeSvgCode(formattedCode)}
+                    </code>
+                  </pre>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Links + license */}
-          <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4 text-sm">
-            {icon.url && (
-              <a
-                href={icon.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Website
-              </a>
-            )}
-            {icon.guidelines && (
-              <a
-                href={icon.guidelines}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Brand Guidelines
-              </a>
-            )}
-            <span className="text-muted-foreground">
-              License:{" "}
-              <span className="font-medium text-foreground">{icon.license}</span>
-            </span>
-          </div>
+          {/* Removed: Links + license section - now in left sidebar */}
         </div>
       </div>
 
       {/* Related icons */}
-      {relatedIcons.length > 0 && (
-        <section className="mt-12">
-          <h2 className="mb-4 text-lg font-semibold">
-            Related in{" "}
-            <span className="text-muted-foreground">{primaryCategory}</span>
-          </h2>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+      {relatedIcons.length > 0 && primaryCategory && (
+        <section className="mt-12 border-t border-border pt-8">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold">
+              Related in{" "}
+              <span className="text-muted-foreground">{primaryCategory}</span>
+            </h2>
+            <Link
+              href={`/?category=${encodeURIComponent(primaryCategory)}`}
+              className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              View all
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {relatedIcons.map((rel) => (
               <Link
                 key={rel.slug}
                 href={`/icon/${rel.slug}`}
-                className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-border/80 hover:bg-accent"
+                className="group flex flex-col items-center gap-2 rounded-xl border border-border bg-card p-3 transition-all hover:border-foreground/20 hover:bg-accent hover:shadow-sm"
               >
                 <div className="icon-preview-bg flex h-12 w-12 items-center justify-center rounded-lg p-2">
                   <img
@@ -597,7 +786,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                     className="h-full w-full object-contain"
                   />
                 </div>
-                <span className="line-clamp-1 w-full text-center text-[10px] text-muted-foreground transition-colors group-hover:text-foreground">
+                <span className="line-clamp-1 w-full text-center text-[10px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
                   {rel.title}
                 </span>
               </Link>

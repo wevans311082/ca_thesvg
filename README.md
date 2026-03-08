@@ -176,19 +176,15 @@ pnpm dev
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for full guidelines.
 
-## Credits
+## Disclaimer
 
-Icons aggregated and curated from open-source libraries:
+All brand names, logos, and trademarks are the property of their respective owners. theSVG provides these icons for development and design purposes only. Use of brand assets must comply with each brand's usage guidelines.
 
-- [simple-icons](https://github.com/simple-icons/simple-icons) - monochrome SVG icons for popular brands
-- [svgl](https://github.com/pheralb/svgl) - beautiful SVG logos
-- [lobe-icons](https://github.com/lobehub/lobe-icons) - AI and tech brand icons
-
-All icons remain under their respective licenses.
+If you are a brand owner and would like an icon updated or removed, please [open an issue](https://github.com/GLINCKER/thesvg/issues) or email **hello@thesvg.org**.
 
 ## License
 
-[MIT](./LICENSE). Individual icon trademarks belong to their respective owners.
+[MIT](./LICENSE) for the codebase and tooling. Individual brand icons and logos remain the intellectual property of their respective trademark holders.
 
 <p align="center">
   <a href="https://thesvg.org">thesvg.org</a>

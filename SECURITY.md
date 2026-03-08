@@ -23,7 +23,7 @@ The following are in scope:
 ## Out of Scope
 
 - Third-party integrations or extensions
-- Issues in upstream icon sources
+- Individual brand icon accuracy or design (contact the brand owner)
 
 ## SVG Security
 

@@ -3,19 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import {
+  ArrowRight,
+  ArrowUpRight,
   Check,
-  ChevronDown,
-  ChevronUp,
   Code,
   Copy,
   Download,
-  ExternalLink,
   FileCode2,
   Globe,
   Heart,
-  Image,
   Link2,
-  Loader2,
   Terminal,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,11 +23,6 @@ import type { CopyFormat } from "@/lib/copy-formats";
 import { formatSvg } from "@/lib/copy-formats";
 import { useFavoritesStore } from "@/lib/stores/favorites-store";
 import { cn } from "@/lib/utils";
-import { svgToPng, downloadPng } from "@/lib/svg-to-png";
-import {
-  generateSnippet,
-  type SnippetFormat,
-} from "@/lib/code-snippets";
 
 interface IconDetailProps {
   icon: IconEntry | null;
@@ -52,55 +44,16 @@ const FORMAT_BUTTONS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { value: "svg", label: "SVG", icon: <Copy className="h-3.5 w-3.5" /> },
-  { value: "jsx", label: "JSX", icon: <Code className="h-3.5 w-3.5" /> },
-  {
-    value: "vue",
-    label: "Vue",
-    icon: <FileCode2 className="h-3.5 w-3.5" />,
-  },
-  {
-    value: "cdn",
-    label: "CDN",
-    icon: <Link2 className="h-3.5 w-3.5" />,
-  },
-  {
-    value: "data-uri",
-    label: "URI",
-    icon: <Globe className="h-3.5 w-3.5" />,
-  },
+  { value: "svg", label: "SVG", icon: <Copy className="h-3 w-3" /> },
+  { value: "jsx", label: "JSX", icon: <Code className="h-3 w-3" /> },
+  { value: "vue", label: "Vue", icon: <FileCode2 className="h-3 w-3" /> },
+  { value: "cdn", label: "CDN", icon: <Link2 className="h-3 w-3" /> },
 ];
-
-const SNIPPET_TABS: { value: SnippetFormat; label: string }[] = [
-  { value: "react", label: "React" },
-  { value: "vue", label: "Vue" },
-  { value: "html", label: "HTML" },
-  { value: "nextjs", label: "Next.js" },
-  { value: "css", label: "CSS" },
-];
-
-const DEMO_SIZES = [16, 24, 32, 48, 64];
-const PNG_EXPORT_SIZES = [32, 64, 128, 256, 512];
-
-/** Naive pretty-print: add line breaks between tags so SVG code is readable */
-function formatSvgCode(raw: string): string {
-  return raw
-    .replace(/>\s*</g, ">\n<")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
 
 export function IconDetail({ icon, onClose }: IconDetailProps) {
   const [activeVariant, setActiveVariant] = useState("default");
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
   const [svgContent, setSvgContent] = useState<string>("");
-  const [showCode, setShowCode] = useState(false);
-  const [showSnippets, setShowSnippets] = useState(false);
-  const [activeSnippetFormat, setActiveSnippetFormat] =
-    useState<SnippetFormat>("react");
-  const [copiedSnippet, setCopiedSnippet] = useState(false);
-  const [exportingSize, setExportingSize] = useState<number | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const isFavorite = useFavoritesStore((s) =>
     icon ? s.favorites.includes(icon.slug) : false
@@ -111,11 +64,6 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
         ([, v]) => v !== undefined && v !== ""
       )
     : [];
-
-  const formattedCode = useMemo(
-    () => (svgContent ? formatSvgCode(svgContent) : ""),
-    [svgContent]
-  );
 
   useEffect(() => {
     if (!icon) return;
@@ -134,9 +82,6 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
   useEffect(() => {
     if (!icon) return;
     setActiveVariant("default");
-    setShowCode(false);
-    setShowSnippets(false);
-    setActiveSnippetFormat("react");
     if (icon.slug !== prevSlugRef.current) {
       prevSlugRef.current = icon.slug;
       posthog.capture("icon_viewed", {
@@ -144,6 +89,7 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
         icon_title: icon.title,
         categories: icon.categories,
         variant_count: Object.values(icon.variants).filter(Boolean).length,
+        source: "quick_preview",
       });
     }
   }, [icon]);
@@ -151,9 +97,7 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
   const handleCopy = useCallback(
     async (format: CopyFormat) => {
       if (!icon || !svgContent) return;
-      const variantKey =
-        activeVariant === "default" ? "default" : activeVariant;
-      const text = formatSvg(svgContent, format, icon.slug, variantKey);
+      const text = formatSvg(svgContent, format, icon.slug, activeVariant);
       await navigator.clipboard.writeText(text);
       setCopiedFormat(format);
       setTimeout(() => setCopiedFormat(null), 1500);
@@ -163,43 +107,11 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
         format,
         variant: activeVariant,
         categories: icon.categories,
+        source: "quick_preview",
       });
     },
     [icon, svgContent, activeVariant]
   );
-
-  const handleCopyRaw = useCallback(async () => {
-    if (!svgContent) return;
-    await navigator.clipboard.writeText(svgContent);
-    setCopiedFormat("raw");
-    setTimeout(() => setCopiedFormat(null), 1500);
-  }, [svgContent]);
-
-  const activeSnippet = useMemo(
-    () =>
-      icon
-        ? generateSnippet(
-            icon.slug,
-            icon.title,
-            activeSnippetFormat,
-            activeVariant
-          )
-        : "",
-    [icon, activeSnippetFormat, activeVariant]
-  );
-
-  const handleCopySnippet = useCallback(async () => {
-    if (!activeSnippet || !icon) return;
-    await navigator.clipboard.writeText(activeSnippet);
-    setCopiedSnippet(true);
-    setTimeout(() => setCopiedSnippet(false), 1500);
-    posthog.capture("icon_snippet_copied", {
-      icon_slug: icon.slug,
-      icon_title: icon.title,
-      snippet_format: activeSnippetFormat,
-      variant: activeVariant,
-    });
-  }, [activeSnippet, icon, activeSnippetFormat, activeVariant]);
 
   const handleDownload = useCallback(async () => {
     if (!icon) return;
@@ -229,47 +141,17 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
       icon_title: icon.title,
       variant: activeVariant,
       categories: icon.categories,
+      source: "quick_preview",
     });
   }, [icon, activeVariant]);
 
-  const handlePngExport = useCallback(
-    async (size: number) => {
-      if (!icon || exportingSize !== null) return;
-      const variantPath =
-        icon.variants[activeVariant as keyof typeof icon.variants] ||
-        icon.variants.default;
-      if (!variantPath) return;
-
-      setExportingSize(size);
-      setExportError(null);
-      try {
-        const blob = await svgToPng(variantPath, size);
-        const variantSuffix =
-          activeVariant !== "default"
-            ? `-${activeVariant.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`
-            : "";
-        downloadPng(blob, `${icon.slug}${variantSuffix}-${size}px`);
-        posthog.capture("icon_png_exported", {
-          icon_slug: icon.slug,
-          icon_title: icon.title,
-          size_px: size,
-          variant: activeVariant,
-          categories: icon.categories,
-        });
-      } catch {
-        setExportError("Could not convert this SVG to PNG. Try another variant.");
-        setTimeout(() => setExportError(null), 3000);
-        posthog.captureException(new Error("PNG export failed"), {
-          icon_slug: icon.slug,
-          variant: activeVariant,
-          size_px: size,
-        });
-      } finally {
-        setExportingSize(null);
-      }
-    },
-    [icon, activeVariant, exportingSize]
-  );
+  const handleCopyCli = useCallback(async () => {
+    if (!icon) return;
+    const cmd = `npx @thesvg/cli add ${icon.slug}`;
+    await navigator.clipboard.writeText(cmd);
+    setCopiedFormat("cli");
+    setTimeout(() => setCopiedFormat(null), 1500);
+  }, [icon]);
 
   if (!icon) return null;
 
@@ -279,25 +161,23 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
 
   return (
     <Dialog open={!!icon} onOpenChange={() => onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-2xl border-border/30 bg-background/95 p-0 shadow-2xl backdrop-blur-2xl sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] max-w-[calc(100%-2rem)] gap-0 overflow-hidden rounded-2xl border-border/30 bg-background/95 p-0 shadow-2xl backdrop-blur-2xl sm:max-w-lg">
         <DialogTitle className="sr-only">{icon.title}</DialogTitle>
 
-        <div className="max-h-[90vh] overflow-y-auto">
-        {/* Top section: preview + info side by side on desktop */}
-        <div className="flex flex-col md:flex-row">
+        <div className="max-h-[85vh] overflow-y-auto">
           {/* Preview area */}
-          <div className="icon-preview-bg relative flex shrink-0 items-center justify-center p-8 md:w-56">
+          <div className="icon-preview-bg relative flex items-center justify-center px-8 py-10">
             <img
               src={currentPath}
               alt={icon.title}
-              className="h-28 w-28 object-contain"
+              className="h-24 w-24 object-contain sm:h-28 sm:w-28"
             />
 
             {/* Hex color */}
             {icon.hex && icon.hex !== "000000" && (
-              <div className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-background/60 px-2 py-0.5 backdrop-blur-sm">
+              <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-background/60 px-2 py-0.5 backdrop-blur-sm">
                 <div
-                  className="h-2.5 w-2.5 rounded-full"
+                  className="h-2.5 w-2.5 rounded-full ring-1 ring-border/20"
                   style={{ backgroundColor: `#${icon.hex}` }}
                 />
                 <span className="font-mono text-[9px] text-muted-foreground">
@@ -319,7 +199,7 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
                 });
               }}
               className={cn(
-                "absolute top-2.5 left-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm transition-colors",
+                "absolute top-3 left-3 flex h-7 w-7 items-center justify-center rounded-full bg-background/60 backdrop-blur-sm transition-colors",
                 isFavorite
                   ? "text-red-500"
                   : "text-muted-foreground hover:text-red-500"
@@ -334,35 +214,43 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
             </button>
           </div>
 
-          {/* Info + actions */}
-          <div className="flex-1 space-y-3 p-4 pr-12">
-            {/* Title + slug */}
-            <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">{icon.title}</h2>
-              <p className="font-mono text-xs text-muted-foreground">
-                {icon.slug}
-              </p>
-            </div>
-
-            {/* Categories */}
-            {icon.categories.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {icon.categories.slice(0, 4).map((cat) => (
-                  <Badge
-                    key={cat}
-                    variant="secondary"
-                    className="rounded-md px-2 py-0.5 text-[10px]"
-                  >
-                    {cat}
-                  </Badge>
-                ))}
-                {icon.categories.length > 4 && (
-                  <span className="text-[10px] text-muted-foreground">
-                    +{icon.categories.length - 4}
-                  </span>
-                )}
+          {/* Content */}
+          <div className="space-y-4 p-4 sm:p-5">
+            {/* Title + slug + categories */}
+            <div className="space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold">{icon.title}</h2>
+                  <p className="font-mono text-xs text-muted-foreground">{icon.slug}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  aria-label="Download SVG"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </button>
               </div>
-            )}
+              {icon.categories.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {icon.categories.slice(0, 3).map((cat) => (
+                    <Badge
+                      key={cat}
+                      variant="secondary"
+                      className="rounded-md px-2 py-0.5 text-[10px]"
+                    >
+                      {cat}
+                    </Badge>
+                  ))}
+                  {icon.categories.length > 3 && (
+                    <span className="self-center text-[10px] text-muted-foreground">
+                      +{icon.categories.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Variant pills */}
             {variants.length > 1 && (
@@ -402,9 +290,9 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
                   key={fmt.value}
                   type="button"
                   className={cn(
-                    "flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-medium transition-colors sm:h-8 sm:px-3",
+                    "flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[11px] font-medium transition-all duration-150",
                     copiedFormat === fmt.value
-                      ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
+                      ? "scale-[1.02] border-green-500/30 bg-green-500/10 text-green-600 shadow-sm dark:text-green-400"
                       : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
                   onClick={() => handleCopy(fmt.value)}
@@ -417,227 +305,81 @@ export function IconDetail({ icon, onClose }: IconDetailProps) {
                   {fmt.label}
                 </button>
               ))}
-              <button
-                type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:h-8 sm:w-8"
-                onClick={handleDownload}
-              >
-                <Download className="h-3.5 w-3.5" />
-              </button>
             </div>
 
-            {/* Links */}
-            <div className="flex flex-wrap gap-3 text-[11px]">
-              <Link
-                href={`/icon/${icon.slug}`}
-                className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
-                onClick={onClose}
-              >
-                <ExternalLink className="h-3 w-3" />
-                Full page
-              </Link>
-              {icon.url && (
-                <a
-                  href={icon.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Website
-                </a>
+            {/* CLI quick command */}
+            <button
+              type="button"
+              onClick={handleCopyCli}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-150",
+                copiedFormat === "cli"
+                  ? "border-green-500/30 bg-green-500/5"
+                  : "border-border bg-card hover:bg-accent/50"
               )}
-              {icon.guidelines && (
-                <a
-                  href={icon.guidelines}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Guidelines
-                </a>
+            >
+              <Terminal className="h-3 w-3 shrink-0 text-orange-500/70" />
+              <code className="flex-1 truncate text-left font-mono text-[11px] text-muted-foreground">
+                npx @thesvg/cli add {icon.slug}
+              </code>
+              {copiedFormat === "cli" ? (
+                <Check className="h-3 w-3 shrink-0 text-green-500" />
+              ) : (
+                <Copy className="h-3 w-3 shrink-0 text-muted-foreground/40" />
               )}
-            </div>
-          </div>
-        </div>
+            </button>
 
-        {/* Size demo section */}
-        <div className="border-t border-border/30 px-4 py-3">
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Size Preview
-          </p>
-          <div className="flex flex-wrap items-end gap-2 sm:gap-4">
-            {DEMO_SIZES.map((size) => (
-              <div key={size} className="flex flex-col items-center gap-1">
-                <div className="icon-preview-bg flex items-center justify-center rounded-md p-1">
-                  <img
-                    src={currentPath}
-                    alt={`${icon.title} at ${size}px`}
-                    style={{ width: size, height: size }}
-                    className="object-contain"
-                  />
-                </div>
-                <span className="font-mono text-[9px] text-muted-foreground">
-                  {size}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Export PNG section */}
-        <div className="border-t border-border/30 px-4 py-3">
-          <div className="mb-2 flex items-center gap-1.5">
-            <Image className="h-3 w-3 text-muted-foreground" />
-            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Export PNG
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {PNG_EXPORT_SIZES.map((size) => (
-              <button
-                key={size}
-                type="button"
-                disabled={exportingSize !== null}
-                onClick={() => handlePngExport(size)}
-                className={cn(
-                  "flex h-7 items-center gap-1 rounded-md border px-2.5 text-[11px] font-medium transition-colors",
-                  exportingSize === size
-                    ? "border-border/50 bg-muted/60 text-muted-foreground"
-                    : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                )}
-              >
-                {exportingSize === size ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : null}
-                {size}px
-              </button>
-            ))}
-          </div>
-          {exportError && (
-            <p className="mt-1.5 text-[10px] text-red-500">{exportError}</p>
-          )}
-        </div>
-
-        {/* Usage snippets (collapsible) */}
-        <div className="border-t border-border/30">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setShowSnippets(!showSnippets)}
-            onKeyDown={(e) => e.key === "Enter" && setShowSnippets(!showSnippets)}
-            className="flex w-full cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/30"
-          >
-            <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              <Terminal className="h-3 w-3" />
-              Usage Snippets
-            </span>
-            {showSnippets ? (
-              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-          </div>
-          {showSnippets && (
-            <div className="px-4 pb-4">
-              {/* Format tabs */}
-              <div className="mb-2 flex flex-wrap gap-1">
-                {SNIPPET_TABS.map((tab) => (
-                  <button
-                    key={tab.value}
-                    type="button"
-                    onClick={() => setActiveSnippetFormat(tab.value)}
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
-                      activeSnippetFormat === tab.value
-                        ? "bg-foreground text-background"
-                        : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    )}
+            {/* Links row */}
+            {(icon.url || icon.guidelines) && (
+              <div className="flex flex-wrap gap-1.5">
+                {icon.url && (
+                  <a
+                    href={icon.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
-                    {tab.label}
-                  </button>
-                ))}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${new URL(icon.url).hostname}&sz=32`}
+                      alt=""
+                      width={12}
+                      height={12}
+                      className="h-3 w-3 rounded-sm"
+                    />
+                    <span className="max-w-[100px] truncate">
+                      {new URL(icon.url).hostname.replace(/^www\./, "")}
+                    </span>
+                    <ArrowUpRight className="h-2.5 w-2.5 opacity-40" />
+                  </a>
+                )}
+                {icon.guidelines && (
+                  <a
+                    href={icon.guidelines}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Globe className="h-3 w-3 opacity-60" />
+                    Guidelines
+                    <ArrowUpRight className="h-2.5 w-2.5 opacity-40" />
+                  </a>
+                )}
               </div>
-              {/* Code block */}
-              <div className="relative">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={handleCopySnippet}
-                  onKeyDown={(e) => e.key === "Enter" && handleCopySnippet()}
-                  className={cn(
-                    "absolute top-1.5 right-2 z-10 flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
-                    copiedSnippet
-                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                      : "bg-background/80 text-muted-foreground backdrop-blur-sm hover:bg-accent hover:text-accent-foreground"
-                  )}
-                >
-                  {copiedSnippet ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                  {copiedSnippet ? "Copied" : "Copy"}
-                </div>
-                <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/40">
-                  <pre className="max-h-40 overflow-x-auto overflow-y-auto p-3 pr-14 font-mono text-[10px] leading-5 text-foreground/80">
-                    <code className="block whitespace-pre">{activeSnippet}</code>
-                  </pre>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* SVG code preview */}
-        <div className="border-t border-border/30">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setShowCode(!showCode)}
-            onKeyDown={(e) => e.key === "Enter" && setShowCode(!showCode)}
-            className="flex w-full cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/30"
-          >
-            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              SVG Code
-            </span>
-            {showCode ? (
-              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             )}
           </div>
-          {showCode && formattedCode && (
-            <div className="relative min-w-0 px-4 pb-4">
-              {/* Copy button floating top-right of code block */}
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={handleCopyRaw}
-                onKeyDown={(e) => e.key === "Enter" && handleCopyRaw()}
-                className={cn(
-                  "absolute top-2 right-6 z-10 flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
-                  copiedFormat === "raw"
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "bg-background/80 text-muted-foreground backdrop-blur-sm hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                {copiedFormat === "raw" ? (
-                  <Check className="h-3 w-3" />
-                ) : (
-                  <Copy className="h-3 w-3" />
-                )}
-                {copiedFormat === "raw" ? "Copied" : "Copy"}
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border/40 bg-muted/40">
-                <pre className="max-h-48 overflow-x-auto overflow-y-auto p-3 pr-16 font-mono text-[10px] leading-5 text-foreground/80">
-                  <code className="block whitespace-pre">{formattedCode}</code>
-                </pre>
-              </div>
-            </div>
-          )}
-        </div>
+
+          {/* Footer: Full page CTA */}
+          <div className="border-t border-border/30 p-3 sm:p-4">
+            <Link
+              href={`/icon/${icon.slug}`}
+              onClick={onClose}
+              className="group/cta flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.99]"
+            >
+              View full details
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/cta:translate-x-0.5" />
+            </Link>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
