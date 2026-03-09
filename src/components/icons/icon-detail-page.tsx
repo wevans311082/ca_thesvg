@@ -790,6 +790,36 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           </div>
         </section>
       )}
+
+      {/* Trademark disclaimer */}
+      <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
+        &ldquo;{icon.title}&rdquo; is a trademark of its respective owner. This icon is provided for identification purposes only.{" "}
+        {icon.url &&
+          (() => {
+            try {
+              const urlObj = new URL(icon.url);
+              if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") {
+                return null;
+              }
+              return (
+                <>
+                  For official brand assets, visit{" "}
+                  <a
+                    href={urlObj.toString()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-muted-foreground"
+                  >
+                    {urlObj.hostname.replace(/^www\./, "")}
+                  </a>
+                  .
+                </>
+              );
+            } catch {
+              return null;
+            }
+          })()}
+      </p>
     </div>
   );
 }
