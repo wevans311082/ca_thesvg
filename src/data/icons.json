@@ -2528,7 +2528,7 @@
       "firetv",
       "fire stick"
     ],
-    "hex": "FC4C02",
+    "hex": "FC4C01",
     "categories": [
       "Entertainment",
       "Software"
@@ -2565,7 +2565,7 @@
     "slug": "amazon-music",
     "title": "Amazon Music",
     "aliases": [],
-    "hex": "25D8FC",
+    "hex": "34D1D9",
     "categories": [
       "Music",
       "Entertainment"
@@ -2584,7 +2584,7 @@
     "aliases": [
       "prime"
     ],
-    "hex": "00A8E1",
+    "hex": "0779FF",
     "categories": [
       "E-commerce",
       "Entertainment"
@@ -67520,8 +67520,7 @@
       "Platform"
     ],
     "variants": {
-      "default": "/icons/prime-video/default.svg",
-      "wordmark": "/icons/prime-video/wordmark.svg"
+      "default": "/icons/prime-video/default.svg"
     },
     "license": "MIT",
     "url": "https://primevideo.com/",
