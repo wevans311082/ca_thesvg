@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -28,40 +29,74 @@ interface IconDetailPageProps {
   relatedIcons?: IconEntry[];
 }
 
-export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps) {
+export function IconDetailPage({
+  icon,
+  relatedIcons = [],
+}: IconDetailPageProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
   // Read variant from URL param, fallback to "default"
   const variantParam = searchParams.get("variant");
-  const initialVariant = variantParam && icon.variants[variantParam as keyof typeof icon.variants] ? variantParam : "default";
+  const initialVariant =
+    variantParam && icon.variants[variantParam as keyof typeof icon.variants]
+      ? variantParam
+      : "default";
   const [activeVariant, setActiveVariant] = useState(initialVariant);
   const [svgContent, setSvgContent] = useState("");
 
   const [downloaded, setDownloaded] = useState(false);
 
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
-  const isFavorite = useFavoritesStore((s) =>
-    s.favorites.includes(icon.slug)
-  );
+  const isFavorite = useFavoritesStore((s) => s.favorites.includes(icon.slug));
 
   // Update URL when variant changes (shareable link)
-  const handleVariantSelect = useCallback((variant: string) => {
-    setActiveVariant(variant);
-    const params = new URLSearchParams(searchParams.toString());
-    if (variant === "default") {
-      params.delete("variant");
-    } else {
-      params.set("variant", variant);
-    }
-    const qs = params.toString();
-    router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
-  }, [searchParams, pathname, router]);
+  const handleVariantSelect = useCallback(
+    (variant: string) => {
+      setActiveVariant(variant);
+      posthog.capture("icon_variant_selected", {
+        slug: icon.slug,
+        variant,
+        source: "detail_page",
+      });
+      const params = new URLSearchParams(searchParams.toString());
+      if (variant === "default") {
+        params.delete("variant");
+      } else {
+        params.set("variant", variant);
+      }
+      const qs = params.toString();
+      const queryString = qs ? `?${qs}` : "";
+      const newUrl = `${pathname}${queryString}`;
+      router.replace(newUrl, { scroll: false });
+    },
+    [searchParams, pathname, router, icon.slug],
+  );
 
   const variants = Object.entries(icon.variants).filter(
-    ([, v]) => v !== undefined && v !== ""
+    ([, v]) => v !== undefined && v !== "",
   );
+
+  // Track page view once
+  const tracked = useRef(false);
+  useEffect(() => {
+    if (tracked.current) return;
+    tracked.current = true;
+    posthog.capture("icon_page_viewed", {
+      slug: icon.slug,
+      title: icon.title,
+      collection: icon.collection,
+      categories: icon.categories,
+      variant_count: variants.length,
+    });
+  }, [
+    icon.slug,
+    icon.title,
+    icon.collection,
+    icon.categories,
+    variants.length,
+  ]);
 
   const currentPath =
     icon.variants[activeVariant as keyof typeof icon.variants] ||
@@ -84,20 +119,26 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
       const a = document.createElement("a");
       a.href = url;
       const variantSuffix =
-        activeVariant !== "default"
-          ? `-${activeVariant.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`
-          : "";
+        activeVariant === "default"
+          ? ""
+          : `-${activeVariant.replaceAll(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`;
       a.download = `${icon.slug}${variantSuffix}.svg`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       setDownloaded(true);
+      posthog.capture("icon_downloaded", {
+        slug: icon.slug,
+        title: icon.title,
+        variant: activeVariant,
+        source: "detail_page",
+      });
       setTimeout(() => setDownloaded(false), 2000);
     } catch {
       window.open(currentPath, "_blank");
     }
-  }, [currentPath, icon.slug, activeVariant, downloaded]);
+  }, [currentPath, icon.slug, activeVariant, downloaded, icon.title]);
 
   const primaryCategory = icon.categories[0] ?? null;
 
@@ -127,7 +168,9 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           </>
         )}
         <span className="text-border">/</span>
-        <span className="min-w-0 truncate font-semibold text-foreground">{icon.title}</span>
+        <span className="min-w-0 truncate font-semibold text-foreground">
+          {icon.title}
+        </span>
       </nav>
 
       {/* Main two-column layout */}
@@ -159,13 +202,13 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                 "absolute top-3 left-3 flex h-8 w-8 items-center justify-center rounded-full border border-border/40 bg-background/70 backdrop-blur-sm transition-colors",
                 isFavorite
                   ? "text-red-500"
-                  : "text-muted-foreground hover:text-red-500"
+                  : "text-muted-foreground hover:text-red-500",
               )}
-              aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+              aria-label={
+                isFavorite ? "Remove from favorites" : "Add to favorites"
+              }
             >
-              <Heart
-                className={cn("h-4 w-4", isFavorite && "fill-current")}
-              />
+              <Heart className={cn("h-4 w-4", isFavorite && "fill-current")} />
             </button>
           </div>
 
@@ -173,20 +216,32 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           <div className="rounded-xl border border-border bg-card p-3 shadow-sm space-y-2.5">
             {icon.license && (
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">License</span>
-                <span className="text-xs text-muted-foreground">{icon.license}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  License
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {icon.license}
+                </span>
               </div>
             )}
             {variants.length > 1 && (
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Variants</span>
-                <span className="text-xs text-muted-foreground">{variants.length}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Variants
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {variants.length}
+                </span>
               </div>
             )}
             {icon.categories.length > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Category</span>
-                <span className="text-xs text-muted-foreground">{icon.categories[0]}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Category
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {icon.categories[0]}
+                </span>
               </div>
             )}
           </div>
@@ -230,25 +285,29 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           {/* Website + Guidelines links */}
           {(icon.url || icon.guidelines) && (
             <div className="space-y-1.5">
-              {icon.url && (() => {
-                const hostname = new URL(icon.url).hostname.replace("www.", "");
-                return (
-                  <a
-                    href={icon.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
-                      alt=""
-                      className="h-3.5 w-3.5 rounded-sm"
-                    />
-                    <span className="flex-1 truncate">{hostname}</span>
-                    <ArrowUpRight className="h-3 w-3 opacity-50" />
-                  </a>
-                );
-              })()}
+              {icon.url &&
+                (() => {
+                  const hostname = new URL(icon.url).hostname.replace(
+                    "www.",
+                    "",
+                  );
+                  return (
+                    <a
+                      href={icon.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+                        alt=""
+                        className="h-3.5 w-3.5 rounded-sm"
+                      />
+                      <span className="flex-1 truncate">{hostname}</span>
+                      <ArrowUpRight className="h-3 w-3 opacity-50" />
+                    </a>
+                  );
+                })()}
               {icon.guidelines && (
                 <a
                   href={icon.guidelines}
@@ -277,7 +336,9 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           {/* Title + slug + download + jsDelivr */}
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight">{icon.title}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {icon.title}
+              </h1>
               <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                 {icon.slug}
               </p>
@@ -291,7 +352,7 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
                   "relative overflow-hidden transition-all duration-300",
                   downloaded
                     ? "bg-green-600 hover:bg-green-600 text-white shadow-green-500/25 shadow-lg"
-                    : ""
+                    : "",
                 )}
               >
                 {downloaded ? (
@@ -382,29 +443,49 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
           <p>
             The {icon.title} SVG icon is available for free download on theSVG.
             {variants.length > 1
-              ? ` This icon comes in ${variants.length} variants: ${variants.map(([name]) => name === "default" ? "color" : name).join(", ")}.`
-              : ""
-            }
+              ? ` This icon comes in ${variants.length} variants: ${variants.map(([name]) => (name === "default" ? "color" : name)).join(", ")}.`
+              : ""}
             {icon.categories.length > 0
               ? ` Categorized under ${icon.categories.join(", ")}.`
-              : ""
-            }
+              : ""}
           </p>
           <p>
-            Use this icon in your projects with React, Vue, Svelte, or plain HTML.
-            Available via npm (<code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">@thesvg/react</code>),
-            CLI (<code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">npx @thesvg/cli add {icon.slug}</code>),
-            or CDN (<code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">cdn.jsdelivr.net/npm/@thesvg/icons/icons/{icon.slug}.svg</code>).
+            Use this icon in your projects with React, Vue, Svelte, or plain
+            HTML. Available via npm (
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              @thesvg/react
+            </code>
+            ), CLI (
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              npx @thesvg/cli add {icon.slug}
+            </code>
+            ), or CDN (
+            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+              cdn.jsdelivr.net/npm/@thesvg/icons/icons/{icon.slug}.svg
+            </code>
+            ).
           </p>
           {icon.collection !== "brands" && (
             <p>
-              Part of the {icon.collection === "aws" ? "AWS Architecture" : icon.collection === "azure" ? "Microsoft Azure" : icon.collection === "gcp" ? "Google Cloud Platform" : icon.collection} icon collection on theSVG.
-              {icon.collectionMeta?.type === "service" ? " This is a service-level icon used in architecture diagrams and documentation." : ""}
+              Part of the{" "}
+              {icon.collection === "aws"
+                ? "AWS Architecture"
+                : icon.collection === "azure"
+                  ? "Microsoft Azure"
+                  : icon.collection === "gcp"
+                    ? "Google Cloud Platform"
+                    : icon.collection}{" "}
+              icon collection on theSVG.
+              {icon.collectionMeta?.type === "service"
+                ? " This is a service-level icon used in architecture diagrams and documentation."
+                : ""}
             </p>
           )}
           <p>
             License: {icon.license}. Free for personal and commercial use.
-            {icon.hex && icon.hex !== "000" ? ` Brand color: #${icon.hex}.` : ""}
+            {icon.hex && icon.hex !== "000"
+              ? ` Brand color: #${icon.hex}.`
+              : ""}
           </p>
         </div>
 
@@ -414,16 +495,26 @@ export function IconDetailPage({ icon, relatedIcons = [] }: IconDetailPageProps)
             Quick usage reference
           </summary>
           <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
-            <p><strong>React:</strong> <code className="rounded bg-muted px-1 py-0.5 font-mono">{`import { ${icon.title.replace(/[^a-zA-Z0-9]/g, "")}Icon } from "@thesvg/react"`}</code></p>
-            <p><strong>HTML:</strong> <code className="rounded bg-muted px-1 py-0.5 font-mono">{`<img src="https://cdn.jsdelivr.net/npm/@thesvg/icons/icons/${icon.slug}.svg" alt="${icon.title}" />`}</code></p>
-            <p><strong>CLI:</strong> <code className="rounded bg-muted px-1 py-0.5 font-mono">{`npx @thesvg/cli add ${icon.slug}`}</code></p>
+            <p>
+              <strong>React:</strong>{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">{`import { ${icon.title.replace(/[^a-zA-Z0-9]/g, "")}Icon } from "@thesvg/react"`}</code>
+            </p>
+            <p>
+              <strong>HTML:</strong>{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">{`<img src="https://cdn.jsdelivr.net/npm/@thesvg/icons/icons/${icon.slug}.svg" alt="${icon.title}" />`}</code>
+            </p>
+            <p>
+              <strong>CLI:</strong>{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">{`npx @thesvg/cli add ${icon.slug}`}</code>
+            </p>
           </div>
         </details>
       </section>
 
       {/* Trademark disclaimer */}
       <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-        &ldquo;{icon.title}&rdquo; is a trademark of its respective owner. This icon is provided for identification purposes only.{" "}
+        &ldquo;{icon.title}&rdquo; is a trademark of its respective owner. This
+        icon is provided for identification purposes only.{" "}
         {icon.url &&
           (() => {
             try {
