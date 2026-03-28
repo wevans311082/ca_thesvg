@@ -31,9 +31,9 @@ export default function Error({
           <RefreshCw className="h-4 w-4" />
           Try again
         </Button>
-        <Button asChild>
-          <a href="/">Go home</a>
-        </Button>
+        <a href="/">
+          <Button>Go home</Button>
+        </a>
       </div>
     </div>
   );
